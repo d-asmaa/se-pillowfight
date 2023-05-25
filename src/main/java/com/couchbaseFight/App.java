@@ -24,13 +24,13 @@ public class App
         int buffer = 100;
 
         /* Read request */
-        int numReadRequest = 100000;
+        int numReadRequest = 0;
         String prefixKey = "cb_";
         int startKeyRange = 0; // Can be used for both read and write
         int endKeyRange = 0;
 
         /* Write request */
-        int numWriteRequest = 0;
+        int numWriteRequest = 1000000;
 
 
         CommandLine commandLine;
