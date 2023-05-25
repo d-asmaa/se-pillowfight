@@ -25,14 +25,12 @@ public class App
 
         /* Read request */
         int numReadRequest = 100000;
-        String prefixKey = "cb";
+        String prefixKey = "cb_";
         int startKeyRange = 0; // Can be used for both read and write
         int endKeyRange = 0;
-        int speed_read = 100;
 
         /* Write request */
         int numWriteRequest = 0;
-        int speed_write = 100; // Persecond
 
 
         CommandLine commandLine;
