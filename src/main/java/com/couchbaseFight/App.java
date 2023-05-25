@@ -143,7 +143,8 @@ public class App
         }
 
 
-        int numConcurrentRequests = 12;
+        int numTasks = 2;
+        int numThreads = 12;
 
     // TEST METRICS // 
 
@@ -168,11 +169,13 @@ public class App
         CouchbaseKV cbKV = new CouchbaseKV(collection);
         /* Read */
         if (numReadRequest > 0) {
-            cbKV.pushReadRequests(numReadRequest, numConcurrentRequests, startKeyRange, endKeyRange, prefixKey);
+            cbKV.pushReadRequests(numReadRequest - (numReadRequest%numThreads), numTasks, numThreads,  startKeyRange, endKeyRange, prefixKey);
+            cbKV.pushReadRequests(numReadRequest%numThreads, 1, 1, startKeyRange, endKeyRange, prefixKey);
         }
 
         if (numWriteRequest > 0) {
-            cbKV.pushWriteRequests(numWriteRequest, numConcurrentRequests, prefixKey);
+            cbKV.pushWriteRequests(numWriteRequest/numTasks, numTasks, numThreads, prefixKey);
+            cbKV.pushWriteRequests(numWriteRequest%numTasks, 1, 1, prefixKey);
         }
   
     }}
