@@ -4,7 +4,6 @@ import java.time.Duration;
 
 import org.apache.commons.cli.*;
 
-import com.couchbase.client.core.env.LoggingMeterConfig;
 import com.couchbase.client.core.retry.BestEffortRetryStrategy;
 import com.couchbase.client.java.*;
 import com.couchbase.client.java.Cluster;
@@ -21,16 +20,20 @@ public class App
         String bucketName = "appointment";
         String scopeName = "_default";
         String collectionName = "_default";
-        int buffer = 100;
 
         /* Read request */
         int numReadRequest = 0;
-        String prefixKey = "cb_";
-        int startKeyRange = 0; // Can be used for both read and write
-        int endKeyRange = 0;
+        String prefixKey = "cb";
+        String separator = "_";
+        Long startKeyRange = 0L; // Can be used for both read and write
+        Long endKeyRange = 499999L;
 
         /* Write request */
         int numWriteRequest = 1000000;
+
+        int numTasks = 2;
+        int numThreads = 12;
+        Long logAfter = 10000L;
 
 
         CommandLine commandLine;
@@ -45,7 +48,11 @@ public class App
         Option option_nw = Option.builder("nw").argName("num_write").hasArg().desc("number of write requests to execute").build();
         Option option_sk = Option.builder("sk").argName("start_key_range").hasArg().desc("the first element of the key range to execute the get on it").build();
         Option option_ek = Option.builder("ek").argName("end_key_range").hasArg().desc("the last element of the key range to execute the get on it").build();
-        Option option_pr = Option.builder("pr").argName("prefix_key").hasArg().desc("The prefix of keys").build();
+        Option option_pr = Option.builder("pr").argName("prefix_key").hasArg().desc("The prefix of keys. By default: cb").build();
+        Option option_tasks = Option.builder("tpt").argName("tasks_per_thread").hasArg().desc("number of tasks per thread. recommended: 1 or 2").build();
+        Option option_thread = Option.builder("th").argName("num_threads").hasArg().desc("number of threads").build();
+        Option option_separator = Option.builder("sep").argName("separator").hasArg().desc("separator between prefix and document key. by default : _ ").build();
+        Option option_log = Option.builder("lg").argName("log-after").hasArg().desc("log metrics after x requests. by default : 10000 ").build();
 
         Options options = new Options();
         CommandLineParser parser = new DefaultParser();
@@ -62,6 +69,10 @@ public class App
         options.addOption(option_s);
         options.addOption(option_f);
         options.addOption(option_pr);
+        options.addOption(option_tasks);
+        options.addOption(option_thread);
+        options.addOption(option_separator);
+        options.addOption(option_log);
 
         String header = "      [<arg1> [<arg2> [<arg3> ...\n       Options, flags and arguments may be in any order";
         HelpFormatter formatter = new HelpFormatter();
@@ -103,17 +114,13 @@ public class App
             if (commandLine.hasOption("sk"))
             {
                 System.out.printf("first element of key list existing in the cluster to test Get: %s%n", commandLine.getOptionValue("sk"));
-                startKeyRange = Integer.parseInt(commandLine.getOptionValue("sk"));
+                startKeyRange = Long.parseLong(commandLine.getOptionValue("sk"));
             }
-            if (commandLine.hasOption("pr"))
-            {
-                System.out.printf("Prefix of keys: %s%n", commandLine.getOptionValue("pr"));
-                startKeyRange = Integer.parseInt(commandLine.getOptionValue("pr"));
-            }
+            
             if (commandLine.hasOption("ek"))
             {
-                System.out.printf("last element of key list existing in the cluster to test Get: %s%n", commandLine.getOptionValue("ek"));
-                endKeyRange = Integer.parseInt(commandLine.getOptionValue("ek"));
+                System.out.printf("last element of key list existing in the cluster to test Get function: %s%n", commandLine.getOptionValue("ek"));
+                endKeyRange = Long.parseLong(commandLine.getOptionValue("ek"));
             }
             if (commandLine.hasOption("b"))
             {
@@ -130,10 +137,30 @@ public class App
                 System.out.printf("couchbase collection: %s%n", commandLine.getOptionValue("c"));
                 collectionName = commandLine.getOptionValue("c");
             }
-            if (commandLine.hasOption("f"))
+            if (commandLine.hasOption("tpt"))
             {
-                System.out.printf("buffer: %s%n", commandLine.getOptionValue("f"));
-                buffer = Integer.parseInt(commandLine.getOptionValue("f"));
+                System.out.printf("number of tasks per thread: %s%n", commandLine.getOptionValue("tpt"));
+                numTasks = Integer.parseInt(commandLine.getOptionValue("tpt"));
+            }
+            if (commandLine.hasOption("th"))
+            {
+                System.out.printf("number of threads: %s%n", commandLine.getOptionValue("th"));
+                numThreads = Integer.parseInt(commandLine.getOptionValue("th"));
+            }
+            if (commandLine.hasOption("pr"))
+            {
+                System.out.printf("Prefix of keys: %s%n", commandLine.getOptionValue("pr"));
+                prefixKey = commandLine.getOptionValue("pr");
+            }
+            if (commandLine.hasOption("sep"))
+            {
+                System.out.printf("Separator between prefix and keys : %s%n", commandLine.getOptionValue("sep"));
+                separator = commandLine.getOptionValue("sep");
+            }
+            if (commandLine.hasOption("lg"))
+            {
+                System.out.printf("log metrics after %s requests %n ", commandLine.getOptionValue("lg"));
+                logAfter = Long.parseLong(commandLine.getOptionValue("lg"));
             }
         }
         catch (ParseException exception)
@@ -142,15 +169,8 @@ public class App
             System.out.println(exception.getMessage());
         }
 
-
-        int numTasks = 2;
-        int numThreads = 12;
-
-    // TEST METRICS // 
-
         ClusterEnvironment environment = ClusterEnvironment
         .builder()
-        .loggingMeterConfig(LoggingMeterConfig.enabled(false))
         .retryStrategy(BestEffortRetryStrategy.withExponentialBackoff(Duration.ofNanos(1000),
                                 Duration.ofMillis(1), 2))
         .build();
@@ -169,13 +189,13 @@ public class App
         CouchbaseKV cbKV = new CouchbaseKV(collection);
         /* Read */
         if (numReadRequest > 0) {
-            cbKV.pushReadRequests(numReadRequest - (numReadRequest%numThreads), numTasks, numThreads,  startKeyRange, endKeyRange, prefixKey);
-            cbKV.pushReadRequests(numReadRequest%numThreads, 1, 1, startKeyRange, endKeyRange, prefixKey);
+            cbKV.pushReadRequests(numReadRequest - (numReadRequest%numThreads), numTasks, numThreads,  startKeyRange, endKeyRange, prefixKey+separator, logAfter);
+            cbKV.pushReadRequests(numReadRequest%numThreads, 1, 1, startKeyRange, endKeyRange, prefixKey+separator, logAfter);
         }
 
         if (numWriteRequest > 0) {
-            cbKV.pushWriteRequests(numWriteRequest/numTasks, numTasks, numThreads, prefixKey);
-            cbKV.pushWriteRequests(numWriteRequest%numTasks, 1, 1, prefixKey);
+            cbKV.pushWriteRequests(numWriteRequest/numTasks, numTasks, numThreads, startKeyRange, prefixKey+separator, logAfter);
+            cbKV.pushWriteRequests(numWriteRequest%numTasks, 1, 1, startKeyRange + numWriteRequest/numTasks +1, prefixKey+separator, logAfter);
         }
   
     }}
