@@ -53,7 +53,7 @@ public class CouchbaseKV {
         })
         .sequential()
         .blockLast();
-
+        System.out.println(accumuCounter.get());
 
     }
 
@@ -87,5 +87,6 @@ public class CouchbaseKV {
         })
         .sequential()
         .blockLast();
+        System.out.println(accumuCounter.get());
     }
 }

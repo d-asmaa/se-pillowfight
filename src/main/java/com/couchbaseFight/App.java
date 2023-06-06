@@ -189,7 +189,7 @@ public class App
         CouchbaseKV cbKV = new CouchbaseKV(collection);
         /* Read */
         if (numReadRequest > 0) {
-            cbKV.pushReadRequests(numReadRequest - (numReadRequest%numThreads), numTasks, numThreads,  startKeyRange, endKeyRange, prefixKey+separator, logAfter);
+            cbKV.pushReadRequests(numReadRequest/numTasks, numTasks, numThreads,  startKeyRange, endKeyRange, prefixKey+separator, logAfter);
             cbKV.pushReadRequests(numReadRequest%numThreads, 1, 1, startKeyRange, endKeyRange, prefixKey+separator, logAfter);
         }
 
