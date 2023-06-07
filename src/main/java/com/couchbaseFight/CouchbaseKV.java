@@ -3,7 +3,7 @@ package com.couchbaseFight;
 import java.text.DecimalFormat;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.couchbase.client.java.ReactiveCollection;
@@ -14,8 +14,8 @@ import reactor.core.scheduler.Schedulers;
 
 public class CouchbaseKV {
     ReactiveCollection collection;
-    AtomicReference<Long> counter = new AtomicReference<Long>();
-    AtomicReference<Long> accumuCounter = new AtomicReference<Long>();
+    AtomicReference<Long> counter = new AtomicReference<>();
+    AtomicReference<Long> accumuCounter = new AtomicReference<>();
 
     Instant startTime;
     public CouchbaseKV(ReactiveCollection collection) {
@@ -32,7 +32,7 @@ public class CouchbaseKV {
         .runOn(Schedulers.newParallel("se-stresstool", numThreads))
         .flatMap(i -> Flux.range(0, numOperations)
                 .flatMap(j -> {
-                    String documentId= prefix + new Random().nextInt(0, numTasks) + new Random().nextLong(start, end);
+                    String documentId= prefix + ThreadLocalRandom.current().nextInt(numTasks) + ThreadLocalRandom.current().nextLong(start,end);
                     return Flux.just(documentId)
                             .flatMap(id -> (this.collection.get(id))
                                     .map(GetResult::contentAsObject)
@@ -44,7 +44,7 @@ public class CouchbaseKV {
             if (cnt % logAfter == 0) {
                 Instant endTime = Instant.now();
                 long durationMillis = Duration.between(startTime, endTime).toMillis();
-                double opsPerSecond =  (cnt / durationMillis) * 1000.0;
+                double opsPerSecond =  ((double) cnt / durationMillis) * 1000.0;
                 DecimalFormat f = new DecimalFormat("##.00");
                 System.out.println(" Read Operations per second: " + f.format(opsPerSecond));
                 startTime = Instant.now(); // Reset start time for the next batch
@@ -78,7 +78,7 @@ public class CouchbaseKV {
             if (cnt % logAfter == 0) {
                 Instant endTime = Instant.now();
                 long durationMillis = Duration.between(startTime, endTime).toMillis();
-                double opsPerSecond =  (cnt / durationMillis) * 1000.0;
+                double opsPerSecond =  ((double) cnt / durationMillis) * 1000.0;
                 DecimalFormat f = new DecimalFormat("##.00");
                 System.out.println("Write Operations per second: " + f.format(opsPerSecond));
                 startTime = Instant.now(); // Reset start time for the next batch
