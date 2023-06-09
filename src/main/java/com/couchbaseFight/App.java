@@ -22,18 +22,20 @@ public class App
         String collectionName = "_default";
 
         /* Read request */
-        int numReadRequest = 0;
+        int numReadRequest = 100000;
         String prefixKey = "cb";
         String separator = "_";
         Long startKeyRange = 0L; // Can be used for both read and write
-        Long endKeyRange = 499999L;
+        Long endKeyRange = 49999L;
 
         /* Write request */
-        int numWriteRequest = 1000000;
+        int numWriteRequest = 0;
 
         int numTasks = 2;
         int numThreads = 12;
-        Long logAfter = 10000L;
+        Long logAfter = 100L;
+        int speed = 0;
+        
 
 
         CommandLine commandLine;
@@ -53,6 +55,7 @@ public class App
         Option option_thread = Option.builder("th").argName("num_threads").hasArg().desc("number of threads").build();
         Option option_separator = Option.builder("sep").argName("separator").hasArg().desc("separator between prefix and document key. by default : _ ").build();
         Option option_log = Option.builder("lg").argName("log-after").hasArg().desc("log metrics after x requests. by default : 10000 ").build();
+        Option option_speed = Option.builder("sp").argName("speed").hasArg().desc("speed(req/sec)").build();
 
         Options options = new Options();
         CommandLineParser parser = new DefaultParser();
@@ -73,6 +76,7 @@ public class App
         options.addOption(option_thread);
         options.addOption(option_separator);
         options.addOption(option_log);
+        options.addOption(option_speed);
 
         String header = "      [<arg1> [<arg2> [<arg3> ...\n       Options, flags and arguments may be in any order";
         HelpFormatter formatter = new HelpFormatter();
@@ -162,6 +166,11 @@ public class App
                 System.out.printf("log metrics after %s requests %n ", commandLine.getOptionValue("lg"));
                 logAfter = Long.parseLong(commandLine.getOptionValue("lg"));
             }
+            if (commandLine.hasOption("sp"))
+            {
+                System.out.printf("speed: %s  req/sec %n ", commandLine.getOptionValue("sp"));
+                speed = Integer.parseInt(commandLine.getOptionValue("sp"));
+            }
         }
         catch (ParseException exception)
         {
@@ -189,13 +198,13 @@ public class App
         CouchbaseKV cbKV = new CouchbaseKV(collection);
         /* Read */
         if (numReadRequest > 0) {
-            cbKV.pushReadRequests(numReadRequest/numTasks, numTasks, numThreads,  startKeyRange, endKeyRange, prefixKey+separator, logAfter);
-            cbKV.pushReadRequests(numReadRequest%numThreads, 1, 1, startKeyRange, endKeyRange, prefixKey+separator, logAfter);
+            cbKV.pushReadRequests(numReadRequest/numTasks, numTasks, numThreads,  startKeyRange, endKeyRange, prefixKey+separator, logAfter , speed);
+            cbKV.pushReadRequests(numReadRequest%numThreads, 1, 1, startKeyRange, endKeyRange, prefixKey+separator, logAfter, speed);
         }
 
         if (numWriteRequest > 0) {
-            cbKV.pushWriteRequests(numWriteRequest/numTasks, numTasks, numThreads, startKeyRange, prefixKey+separator, logAfter);
-            cbKV.pushWriteRequests(numWriteRequest%numTasks, 1, 1, startKeyRange + numWriteRequest/numTasks +1, prefixKey+separator, logAfter);
+            cbKV.pushWriteRequests(numWriteRequest/numTasks, numTasks, numThreads, startKeyRange, prefixKey+separator, logAfter, speed);
+            cbKV.pushWriteRequests(numWriteRequest%numTasks, 1, 1, startKeyRange + numWriteRequest/numTasks +1, prefixKey+separator, logAfter, speed);
         }
   
     }}

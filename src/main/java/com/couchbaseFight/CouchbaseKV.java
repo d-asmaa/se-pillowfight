@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import com.couchbase.client.java.ReactiveCollection;
 import com.couchbase.client.java.kv.GetResult;
+import com.google.common.util.concurrent.RateLimiter;
 
 import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
@@ -22,16 +23,18 @@ public class CouchbaseKV {
         this.collection = collection;
     }
     
-    public void pushReadRequests(int numOperations, int numTasks, int numThreads, Long start, Long end, String prefix, Long logAfter){
+    public void pushReadRequests(int numOperations, int numTasks, int numThreads, Long start, Long end, String prefix, Long logAfter, int speed){
         counter.set(0L); // Counter for number of operations
         accumuCounter.set(0L);
         startTime = Instant.now(); // Start time for measuring duration
+        RateLimiter limiter = RateLimiter.create(speed);
 
         Flux.range(0, numTasks)
         .parallel()
         .runOn(Schedulers.newParallel("se-stresstool", numThreads))
         .flatMap(i -> Flux.range(0, numOperations)
                 .flatMap(j -> {
+                    if(speed!=0) {limiter.acquire();}
                     String documentId= prefix + new Random().nextInt(0, numTasks) + new Random().nextLong(start, end);
                     return Flux.just(documentId)
                             .flatMap(id -> (this.collection.get(id))
@@ -57,18 +60,20 @@ public class CouchbaseKV {
 
     }
 
-    public void pushWriteRequests(int numOperations, int numTasks, int numThreads, Long start, String prefix, Long logAfter){
+    public void pushWriteRequests(int numOperations, int numTasks, int numThreads, Long start, String prefix, Long logAfter, int speed){
         counter.set(0L); // Counter for number of operations
         accumuCounter.set(0L);
         startTime = Instant.now(); // Start time for measuring duration
 
         DocGenerator docGenerator = new DLDocGenerator();
+        RateLimiter limiter = RateLimiter.create(speed);
 
         Flux.range(0, numTasks)
         .parallel()
         .runOn(Schedulers.newParallel("se-stresstool", numThreads)) 
         .flatMap(i -> Flux.range(0, numOperations)
                 .flatMap(j -> { 
+                    if(speed!=0) {limiter.acquire();}
                     String documentId = prefix+i.toString()+ (start+j);
                     return collection.upsert(documentId, docGenerator.generateDoc(i));
                 })
