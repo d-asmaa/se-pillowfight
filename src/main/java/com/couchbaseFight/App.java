@@ -199,7 +199,7 @@ public class App
         /* Read */
         if (numReadRequest > 0) {
             cbKV.pushReadRequests(numReadRequest/numTasks, numTasks, numThreads,  startKeyRange, endKeyRange, prefixKey+separator, logAfter , speed);
-            cbKV.pushReadRequests(numReadRequest%numThreads, 1, 1, startKeyRange, endKeyRange, prefixKey+separator, logAfter, speed);
+            cbKV.pushReadRequests(numReadRequest%numTasks, 1, 1, startKeyRange, endKeyRange, prefixKey+separator, logAfter, speed);
         }
 
         if (numWriteRequest > 0) {
